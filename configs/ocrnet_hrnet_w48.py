@@ -3,8 +3,7 @@ _base_ = './_base_/cityscapes_256x512_800ep.py'
 norm_cfg = dict(type='SyncBN', requires_grad=True)
 channels = [48, 96, 192, 384]
 data_preprocessor = dict(
-    type='SegDataPreProcessor', mean=[123.675, 116.28, 103.53],
-    std=[58.395, 57.12, 57.375], bgr_to_rgb=True,
+    type='SegDataPreProcessor', mean=None, std=None, bgr_to_rgb=False,
     pad_val=0, seg_pad_val=255, size=(256, 512))
 model = dict(
     type='CascadeEncoderDecoder', data_preprocessor=data_preprocessor,

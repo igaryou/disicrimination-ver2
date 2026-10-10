@@ -12,10 +12,11 @@ crop_size = (256, 512)
 train_pipeline = [
     dict(type='LoadImageFromFile'),
     dict(type='LoadAnnotations'),
-    dict(type='Resize', scale=(512, 256), keep_ratio=False),
-    dict(type='RandomFlip', prob=0.5, direction='horizontal'),
     dict(
-        type='TorchvisionColorJitter',
+        type='DFMCityscapesTransform',
+        size=(256, 512),
+        training=True,
+        flip_probability=0.5,
         brightness=0.2,
         contrast=0.2,
         saturation=0.2,
@@ -25,7 +26,7 @@ train_pipeline = [
 test_pipeline = [
     dict(type='LoadImageFromFile'),
     dict(type='LoadAnnotations'),
-    dict(type='Resize', scale=(512, 256), keep_ratio=False),
+    dict(type='DFMCityscapesTransform', size=(256, 512), training=False),
     dict(type='SetFixedEvaluationMetadata', size=(256, 512)),
     dict(type='PackSegInputs'),
 ]
@@ -55,7 +56,8 @@ val_dataloader = dict(
 test_dataloader = val_dataloader
 
 val_evaluator = dict(
-    type='CityscapesDetailedMetric', ignore_index=255, prefix='val')
+    type='CityscapesDetailedMetric', ignore_index=255,
+    target_size=(256, 512), prefix='val')
 test_evaluator = val_evaluator
 
 optim_wrapper = dict(

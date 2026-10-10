@@ -41,27 +41,50 @@ before Hungarian matching; its internal no-object class remains intact.
 Common conditions:
 
 - train/validation splits: `train` / `val`
-- resolution: 256x512 (H x W), bilinear image resize and nearest mask resize
-- train augmentation: fixed resize, horizontal flip p=0.5, torchvision
-  ColorJitter (0.2, 0.2, 0.2, 0.1), ImageNet normalization
-- validation: fixed resize and ImageNet normalization only
+- resolutions: 256x512 and 128x256 (H x W)
+- train augmentation: the tensor implementation and operation order used by
+  [DFM-ver2 Original](https://github.com/igaryou/DFM-ver2)
+- validation: the same tensor resize and ImageNet normalization, without flip
+  or ColorJitter
 - batch size: 4; 800 epochs; validation every 100 epochs
 - bf16 autocast through `AmpOptimWrapper`
 - AdamW, lr 1e-4, weight decay 0.01 for every model
 - no warmup; PolyLR power 1.0 from 1e-4 to 1e-6 across 800 epochs
-- whole-image inference; final logits/prediction are restored to 256x512 with
-  `align_corners=False`
+- whole-image inference; final logits/predictions are restored to the selected
+  fixed resolution with `align_corners=False`
 
 No random crop, random scale, or PhotoMetricDistortion is used. Backbone
 parameter-wise LR multipliers from some upstream recipes are intentionally
 removed so optimizer conditions remain common; this does not alter model
 architecture or model-specific loss.
 
-For validation/test, annotations are loaded before the joint fixed `Resize`.
-The resized 256x512 shape is then recorded as `ori_shape`, so MMSegmentation's
-post-processing keeps predictions at 256x512 instead of restoring native
-Cityscapes resolution. The metric rejects any prediction or GT that is not
-exactly 256x512.
+### DFM Original-compatible augmentation
+
+`DFMCityscapesTransform` reproduces the fixed-resolution path in DFM-ver2
+`src/dataset.py`. MMSegmentation's BGR uint8 array is explicitly converted to
+an RGB float32 CHW tensor in `[0, 1]`. Training then applies:
+
+```text
+RGB float [0,1]
+-> horizontal flip (p=0.5)
+-> torchvision.functional.resize(image, bilinear, antialias=True)
+-> torchvision.functional.resize(mask, nearest)
+-> torchvision ColorJitter(0.2, 0.2, 0.2, 0.1) on the float tensor
+-> clamp(0, 1)
+-> (image - ImageNet mean) / ImageNet std
+-> PackSegInputs
+```
+
+Validation omits flip and ColorJitter, using RGB float conversion, the same
+torchvision image/mask resize, and ImageNet normalization. The model
+`SegDataPreProcessor` has `mean=None`, `std=None`, and `bgr_to_rgb=False`, so it
+continues to move, pad and batch samples without applying normalization or
+channel conversion a second time.
+
+For validation/test, the selected fixed size is recorded as `ori_shape`, so
+MMSegmentation post-processing never restores native Cityscapes resolution.
+The metric enforces matching GT/prediction shapes: 256x512 for the standard
+configs and 128x256 for the additional low-resolution configs.
 
 ## Architectures and provenance
 
@@ -88,7 +111,7 @@ parameter-wise LR/weight-decay multipliers are omitted.
 
 ## Training
 
-Authenticate once with `uv run wandb login`, then run one of:
+Authenticate once with `uv run wandb login`. For 256x512, run one of:
 
 ```bash
 scripts/train_deeplabv3plus_r101.sh
@@ -97,6 +120,17 @@ scripts/train_ocrnet_hrnet_w48.sh
 scripts/train_mask2former_swin_s.sh
 scripts/train_upernet_swin_s.sh
 scripts/train_segformer_mit_b5.sh
+```
+
+For 128x256, run one of:
+
+```bash
+scripts/train_deeplabv3plus_r101_128x256.sh
+scripts/train_pspnet_r101_128x256.sh
+scripts/train_ocrnet_hrnet_w48_128x256.sh
+scripts/train_mask2former_swin_s_128x256.sh
+scripts/train_upernet_swin_s_128x256.sh
+scripts/train_segformer_mit_b5_128x256.sh
 ```
 
 Each script forwards extra CLI options. Examples:
@@ -113,16 +147,27 @@ Mask2Former components), learning rate, epoch, and validation metrics.
 
 ## Evaluation
 
+256x512 example:
+
 ```bash
 uv run python -m src.evaluate \
   configs/deeplabv3plus_r101.py \
   results/deeplabv3plus_r101_256x512_800ep/best_miou.pth
 ```
 
+128x256 example:
+
+```bash
+uv run python -m src.evaluate \
+  configs/deeplabv3plus_r101_128x256.py \
+  results/deeplabv3plus_r101_128x256_800ep/best_miou.pth
+```
+
 Replace the config/checkpoint pair for another model. Evaluation returns pixel
 accuracy, mIoU, mAcc, and all 19 class IoU/accuracy values. It also writes
 `latest_metrics.json` under the config's `evaluation/` directory, including
-the full 19x19 confusion matrix.
+the full 19x19 confusion matrix. GT and prediction are evaluated at the fixed
+config resolution; native-resolution Cityscapes evaluation is not performed.
 
 ## Checkpoints and outputs
 

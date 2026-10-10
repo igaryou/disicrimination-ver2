@@ -5,8 +5,7 @@ checkpoint = ('https://download.openmmlab.com/mmsegmentation/v0.5/pretrain/'
 norm_cfg = dict(type='SyncBN', requires_grad=True)
 backbone_norm_cfg = dict(type='LN', requires_grad=True)
 data_preprocessor = dict(
-    type='SegDataPreProcessor', mean=[123.675, 116.28, 103.53],
-    std=[58.395, 57.12, 57.375], bgr_to_rgb=True,
+    type='SegDataPreProcessor', mean=None, std=None, bgr_to_rgb=False,
     pad_val=0, seg_pad_val=255, size=(256, 512))
 model = dict(
     type='EncoderDecoder', data_preprocessor=data_preprocessor,
