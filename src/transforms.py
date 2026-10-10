@@ -23,3 +23,30 @@ class TorchvisionColorJitter(BaseTransform):
         rgb = np.asarray(self.jitter(Image.fromarray(rgb))).copy()
         results['img'] = rgb[..., ::-1].copy()
         return results
+
+
+@TRANSFORMS.register_module()
+class SetFixedEvaluationMetadata(BaseTransform):
+    """Make the resized resolution the canonical evaluation resolution.
+
+    MMSegmentation post-processes logits back to ``ori_shape``. This transform
+    is deliberately placed after the joint image/GT Resize so predictions are
+    restored to the fixed evaluation size rather than native Cityscapes size.
+    """
+
+    def __init__(self, size=(256, 512)):
+        self.size = tuple(size)
+
+    def transform(self, results):
+        image_shape = tuple(results['img'].shape[:2])
+        gt_shape = tuple(results['gt_seg_map'].shape[:2])
+        if image_shape != self.size or gt_shape != self.size:
+            raise ValueError(
+                'Fixed evaluation resize must produce image and GT shapes '
+                f'{self.size}, but got image={image_shape}, GT={gt_shape}.')
+
+        # BaseSegmentor.postprocess_result() resizes logits to ori_shape.
+        results['ori_shape'] = self.size
+        results['img_shape'] = self.size
+        results['pad_shape'] = self.size
+        return results

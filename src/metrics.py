@@ -21,16 +21,22 @@ class CityscapesDetailedMetric(BaseMetric):
 
     default_prefix = 'val'
 
-    def __init__(self, ignore_index=255, output_dir=None, collect_device='cpu',
-                 prefix=None):
+    def __init__(self, ignore_index=255, output_dir=None,
+                 target_size=(256, 512), collect_device='cpu', prefix=None):
         super().__init__(collect_device=collect_device, prefix=prefix)
         self.ignore_index = ignore_index
         self.output_dir = output_dir
+        self.target_size = tuple(target_size)
 
     def process(self, data_batch, data_samples):
         for sample in data_samples:
             pred = sample.pred_sem_seg.data.squeeze().cpu().numpy().astype(np.int64)
             target = sample.gt_sem_seg.data.squeeze().cpu().numpy().astype(np.int64)
+            if pred.shape != self.target_size or target.shape != self.target_size:
+                raise ValueError(
+                    'Cityscapes evaluation requires prediction and GT shapes '
+                    f'{self.target_size}, but got prediction={pred.shape}, '
+                    f'GT={target.shape}.')
             valid = ((target != self.ignore_index) & (target >= 0) &
                      (target < 19) & (pred >= 0) & (pred < 19))
             hist = np.bincount(

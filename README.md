@@ -57,6 +57,12 @@ parameter-wise LR multipliers from some upstream recipes are intentionally
 removed so optimizer conditions remain common; this does not alter model
 architecture or model-specific loss.
 
+For validation/test, annotations are loaded before the joint fixed `Resize`.
+The resized 256x512 shape is then recorded as `ori_shape`, so MMSegmentation's
+post-processing keeps predictions at 256x512 instead of restoring native
+Cityscapes resolution. The metric rejects any prediction or GT that is not
+exactly 256x512.
+
 ## Architectures and provenance
 
 | Config | Official MMSegmentation basis | Backbone pretraining | Approx. params |

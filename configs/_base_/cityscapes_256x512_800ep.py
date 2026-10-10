@@ -24,8 +24,9 @@ train_pipeline = [
 ]
 test_pipeline = [
     dict(type='LoadImageFromFile'),
-    dict(type='Resize', scale=(512, 256), keep_ratio=False),
     dict(type='LoadAnnotations'),
+    dict(type='Resize', scale=(512, 256), keep_ratio=False),
+    dict(type='SetFixedEvaluationMetadata', size=(256, 512)),
     dict(type='PackSegInputs'),
 ]
 
@@ -80,7 +81,7 @@ default_hooks = dict(
     param_scheduler=dict(type='ParamSchedulerHook'),
     checkpoint=dict(
         type='CheckpointHook', by_epoch=True, interval=100,
-        filename='epoch_{epoch:04d}.pth', save_optimizer=True,
+        filename_tmpl='epoch_{:04d}.pth', save_optimizer=True,
         save_param_scheduler=True, max_keep_ckpts=-1),
     sampler_seed=dict(type='DistSamplerSeedHook'),
     visualization=dict(type='SegVisualizationHook'))
